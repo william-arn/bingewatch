@@ -27,7 +27,7 @@ public class Movie{
     public void setTitle(String title){this.title = title;}
     public String getGenre(){return genre;}
     public void setGenre(String genre){this.genre = genre;}
-    public Integer getYear() { return releaseYear; }
-    public void setYear(Integer releaseYear) { this.releaseYear = releaseYear; }
+    public Integer getReleaseYear() { return releaseYear; }
+    public void setReleaseYear(Integer releaseYear) { this.releaseYear = releaseYear; }
 
 }
