@@ -66,7 +66,7 @@ bingewatch/
 ├── catalog-service/             # PHASE 1 — built first
 │   ├── build.gradle.kts
 │   └── src/main/
-│       ├── java/com/yourname/catalog/
+│       ├── java/com/bingewatch/catalog/
 │       │   ├── CatalogServiceApplication.java
 │       │   ├── domain/Movie.java            # JPA entity
 │       │   ├── repo/MovieRepository.java     # Spring Data JPA
@@ -89,7 +89,7 @@ The first runnable slice: a `Movie` REST API backed by Postgres. No gRPC yet.
 | Project | **Gradle - Kotlin** |
 | Language | Java |
 | Spring Boot | **3.5.15** |
-| Group | `com.yourname` |
+| Group | `com.bingewatch` |
 | Artifact | `catalog-service` |
 | Packaging | Jar |
 | Java | **21** |
@@ -138,11 +138,11 @@ server:
 
 ### Step 5 — The layers
 
-Under `src/main/java/com/yourname/catalog/`:
+Under `src/main/java/com/bingewatch/catalog/`:
 
 **`domain/Movie.java`**
 ```java
-package com.yourname.catalog.domain;
+package com.bingewatch.catalog.domain;
 
 import jakarta.persistence.*;
 
@@ -175,9 +175,9 @@ public class Movie {
 
 **`repo/MovieRepository.java`**
 ```java
-package com.yourname.catalog.repo;
+package com.bingewatch.catalog.repo;
 
-import com.yourname.catalog.domain.Movie;
+import com.bingewatch.catalog.domain.Movie;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
@@ -188,10 +188,10 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
 
 **`web/CatalogController.java`**
 ```java
-package com.yourname.catalog.web;
+package com.bingewatch.catalog.web;
 
-import com.yourname.catalog.domain.Movie;
-import com.yourname.catalog.repo.MovieRepository;
+import com.bingewatch.catalog.domain.Movie;
+import com.bingewatch.catalog.repo.MovieRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -266,7 +266,7 @@ curl.exe "http://localhost:8080/movies?genre=SciFi"
 ```proto
 syntax = "proto3";
 option java_multiple_files = true;
-option java_package = "com.yourname.catalog.grpc.proto";
+option java_package = "com.bingewatch.catalog.grpc.proto";
 
 service CatalogService {
   rpc GetMovie (GetMovieRequest) returns (MovieReply);
