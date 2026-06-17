@@ -16,8 +16,8 @@ public class CatalogService {
         this.repo = repo;
     }
 
-    public List<Movie> findAll(String genre) {
-        return (genre == null) ? repo.findAll() : repo.findByGenre(genre);
+    public List<Movie> findAll(String genre, Integer releaseYear){
+        return repo.findAll(genre,releaseYear);
     }
 
     public Optional<Movie> findById(Long id) {

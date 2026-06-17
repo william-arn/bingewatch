@@ -18,8 +18,10 @@ public class CatalogController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Movie>> findAll(@RequestParam(required = false) String genre) {
-        return ResponseEntity.ok(service.findAll(genre));
+    public ResponseEntity<List<Movie>> findAll(
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) Integer releaseYear) {
+        return ResponseEntity.ok(service.findAll(genre, releaseYear));
     }
 
     @GetMapping("/{id}")
