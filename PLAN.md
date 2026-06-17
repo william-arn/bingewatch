@@ -239,22 +239,137 @@ creating the `movies` table and `Tomcat started on port 8080`.
 
 ### Step 7 — Test
 
+On Windows/PowerShell, prefer `Invoke-RestMethod` — the Unix-style `curl -d '{\"..\"}'`
+escaping gets mangled by PowerShell's parser.
+
 ```powershell
 # Create
-curl.exe -X POST http://localhost:8080/movies -H "Content-Type: application/json" -d '{\"title\":\"The Matrix\",\"genre\":\"SciFi\",\"year\":1999}'
+Invoke-RestMethod -Uri http://localhost:8080/movies -Method Post `
+  -ContentType 'application/json' `
+  -Body '{"title":"The Matrix","genre":"SciFi","releaseYear":1999}'
 # List all
-curl.exe http://localhost:8080/movies
+Invoke-RestMethod http://localhost:8080/movies
 # By id
-curl.exe http://localhost:8080/movies/1
+Invoke-RestMethod http://localhost:8080/movies/1
 # Filter by genre
-curl.exe "http://localhost:8080/movies?genre=SciFi"
+Invoke-RestMethod "http://localhost:8080/movies?genre=SciFi"
+# Delete
+Invoke-RestMethod -Uri http://localhost:8080/movies/1 -Method Delete
 ```
 
-### Phase 1 follow-ups (once it runs)
-- Add Bean Validation (`@NotBlank` on title, `@Valid` in the controller).
-- Introduce a DTO instead of exposing the entity directly.
-- Add a `CatalogService` layer.
-- Swap `ddl-auto` for Flyway migrations.
+> Note: the JSON field is `releaseYear` (it matches the entity's `getReleaseYear`/
+> `setReleaseYear` accessors — Jackson derives JSON property names from the getters/setters,
+> not the column name). Even better than the shell for repeated testing: a REST client like
+> **Bruno** or the **IntelliJ HTTP Client** (a `.http` scratch file).
+
+---
+
+## 5b. Phase 1B — harden catalog-service before gRPC
+
+Phase 1 gives a *working* service. Phase 1B makes it a *well-architected* one — and
+every item here pays off in Phase 2, because the gRPC server will reuse the same service
+layer, DTO-mapping discipline, and schema. Do these in order; each builds on the last.
+
+### Step 1 — Introduce a service layer (`CatalogService`)
+
+**Why:** The controller currently talks to the repository directly. Once gRPC arrives,
+*two* entry points (REST + gRPC) will need the same business logic. Putting that logic in
+a `CatalogService` means it's written once and shared, and the controllers stay thin.
+
+- Create `service/CatalogService.java`, annotate it `@Service`.
+- Move the read/create/delete logic into it (e.g. `list(genre)`, `getById(id)`,
+  `create(...)`, `delete(id)`).
+- Inject `CatalogService` into `CatalogController` (constructor injection) instead of the
+  repository. The controller becomes purely "HTTP in, HTTP out."
+
+```
+Controller (HTTP)  ─┐
+                    ├─▶  CatalogService (business logic)  ─▶  MovieRepository  ─▶  DB
+gRPC handler (P2)  ─┘
+```
+
+### Step 2 — Introduce DTOs (stop exposing the entity)
+
+**Why:** Right now the JPA entity *is* the API contract — `@RequestBody Movie` and
+returning `Movie` directly. That couples your database schema to your public API: a column
+rename leaks to clients, and clients can POST fields like `id` that you don't want them to
+set. DTOs (Data Transfer Objects) decouple the two.
+
+- `web/dto/MovieRequest.java` — fields clients may send (`title`, `genre`, `releaseYear`);
+  **no** `id`.
+- `web/dto/MovieResponse.java` — fields you return (includes `id`).
+- Map between DTO ↔ entity in the service (or a small mapper). Start by hand; a library
+  like MapStruct is a later option.
+- **Tip:** Java `record` types are perfect for DTOs — immutable, concise:
+  `public record MovieRequest(String title, String genre, Integer releaseYear) {}`
+
+### Step 3 — Add Bean Validation
+
+**Why:** Reject bad input at the edge with clear 400 errors instead of letting nulls/blanks
+reach the database.
+
+- Add constraints to `MovieRequest`: `@NotBlank` on `title`, `@NotBlank` on `genre`,
+  optionally `@Positive`/`@Min(1888)` on `releaseYear`.
+- Add `@Valid` before `@RequestBody MovieRequest` in the controller.
+- (Dependency `spring-boot-starter-validation` is already on the classpath.)
+
+### Step 4 — Global exception handling (`@RestControllerAdvice`)
+
+**Why:** Pairs with Steps 2–3. Centralize error responses so clients get clean, consistent
+JSON instead of stack traces. This also replaces the ad-hoc `Optional.orElse(notFound())`
+pattern with a tidy "throw + handle" flow.
+
+- Create a `NotFoundException` and have `CatalogService.getById` throw it when missing.
+- Create `web/ApiExceptionHandler.java` annotated `@RestControllerAdvice` that maps:
+  - `NotFoundException` → `404` with a small error body,
+  - `MethodArgumentNotValidException` (validation failures) → `400` with field errors.
+- Turn off the leaking stack traces: `server.error.include-stacktrace: never` in YAML.
+
+### Step 5 — Tighten HTTP semantics
+
+**Why:** Make the API correct and idiomatic — good portfolio signal.
+
+- `POST` returns **`201 Created`** (optionally with a `Location` header via
+  `ServletUriComponentsBuilder`).
+- Add **`PUT /movies/{id}`** for full update (and/or `PATCH` for partial).
+- Confirm `DELETE` returns **`204 No Content`**.
+- Decide a convention: every endpoint returns `ResponseEntity<…>` for uniformity, *or*
+  plain bodies where always-200 — just be consistent.
+
+### Step 6 — Add tests
+
+**Why:** A repo with no tests is a red flag to a reviewer; this is also where you learn
+Spring's test slices (cheaper than always booting the full app).
+
+- `@WebMvcTest(CatalogController.class)` + `MockMvc`, mocking `CatalogService` — tests the
+  web layer fast, no DB.
+- `@DataJpaTest` — tests `MovieRepository` (including `findByGenre`) against a real Postgres
+  via **Testcontainers** (closest to prod) or an in-memory H2 (simplest).
+- One `@SpringBootTest` smoke test (you already have `contextLoads`).
+
+### Step 7 — Flyway migrations (replace `ddl-auto`)
+
+**Why:** `ddl-auto: update` is convenient for learning but unsafe and non-explicit for real
+apps — it can't do controlled, versioned schema changes. Flyway makes the schema a
+reviewed, version-controlled artifact. Do this **last**, once the entity has settled.
+
+- Add dependency `org.flywaydb:flyway-database-postgresql`.
+- Create `src/main/resources/db/migration/V1__create_movies.sql` with the `movies` table
+  DDL (you can copy the `create table` statement Hibernate logged at startup).
+- Set `spring.jpa.hibernate.ddl-auto: validate` (Hibernate now only *checks* that entities
+  match the Flyway-managed schema, never alters it).
+
+### Step 8 — Housekeeping
+
+- Silence the startup warning by setting `spring.jpa.open-in-view: false` explicitly (and
+  understand why: it keeps the persistence session open during view rendering — fine here,
+  but off is the safer default for services).
+- Run **Ctrl+Alt+L** in IntelliJ to standardize formatting.
+- Write the public `README.md` (the Netflix-DGS/Gradle framing lives here).
+
+**Definition of done for Phase 1B:** thin controller → `@Service` → repository; DTOs at the
+boundary; validated input; consistent error JSON; correct status codes; meaningful tests;
+Flyway-managed schema with `ddl-auto: validate`. *Then* move to gRPC.
 
 ---
 
