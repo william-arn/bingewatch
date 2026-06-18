@@ -2,6 +2,8 @@ package com.bingewatch.catalog.web;
 
 import com.bingewatch.catalog.domain.Movie;
 import com.bingewatch.catalog.service.CatalogService;
+import com.bingewatch.catalog.web.dto.MovieResponse;
+import com.bingewatch.catalog.web.dto.MovieRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,22 +20,28 @@ public class CatalogController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Movie>> findAll(
+    public ResponseEntity<List<MovieResponse>> findAll(
             @RequestParam(required = false) String genre,
             @RequestParam(required = false) Integer releaseYear) {
-        return ResponseEntity.ok(service.findAll(genre, releaseYear));
+        List<MovieResponse> body = service.findAll(genre,releaseYear).stream()
+                .map(MovieResponse::from)
+                .toList();
+
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Movie> findById(@PathVariable Long id) {
+    public ResponseEntity<MovieResponse> findById(@PathVariable Long id) {
         return service.findById(id)
+                .map(MovieResponse::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Movie> create(@RequestBody Movie movie) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(movie));
+    public ResponseEntity<MovieResponse> create(@RequestBody MovieRequest request) {
+        Movie movie = service.create(request.toEntity());
+        return ResponseEntity.status(HttpStatus.CREATED).body(MovieResponse.from(movie));
     }
 
     @DeleteMapping("/{id}")
@@ -41,5 +49,4 @@ public class CatalogController {
         service.deleteById(id);
         return ResponseEntity.noContent().build();
     }
-
 }
