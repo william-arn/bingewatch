@@ -7,6 +7,7 @@ import com.bingewatch.catalog.web.dto.MovieResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -39,7 +40,7 @@ public class CatalogController {
     }
 
     @PostMapping
-    public ResponseEntity<MovieResponse> create(@RequestBody MovieRequest request) {
+    public ResponseEntity<MovieResponse> create(@Valid @RequestBody MovieRequest request) {
         Movie movie = service.create(request.toEntity());
         return ResponseEntity.status(HttpStatus.CREATED).body(MovieResponse.from(movie));
     }
