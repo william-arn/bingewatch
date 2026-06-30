@@ -11,5 +11,8 @@ spring:
     show-sql: true          # logs the SQL JPA generates
     properties:
       hibernate.format_sql: true
+  mvc:
+    problemdetails:
+      enabled: true
 server:
   port: 8080

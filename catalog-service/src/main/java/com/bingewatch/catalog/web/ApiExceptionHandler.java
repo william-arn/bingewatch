@@ -1,11 +1,7 @@
 package com.bingewatch.catalog.web;
 
 import com.bingewatch.catalog.exception.NotFoundException;
-import com.bingewatch.catalog.web.dto.ApiError;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -14,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,9 +19,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(NotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(NotFoundException ex){
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiError.of(HttpStatus.NOT_FOUND.value(),ex.getMessage()));
+    public ProblemDetail handleNotFound(NotFoundException ex){
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Not found");
+        pd.setType(URI.create("https://bingewatch.dev/errors/not-found"));
+        return pd;
     }
 
     @Override
@@ -33,18 +32,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpHeaders headers,
             HttpStatusCode status,
             WebRequest request){
-        Map<String,String> fieldErrors = new HashMap<>();
+        Map<String,String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(err ->
-                fieldErrors.put(err.getField(), err.getDefaultMessage()));
+                errors.put(err.getField(), err.getDefaultMessage()));
 
-        ApiError body = ApiError.of(HttpStatus.BAD_REQUEST.value(), "Validation failed", fieldErrors);
-        return handleExceptionInternal(ex,body,headers,status,request);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        pd.setTitle("Validation Error");
+        pd.setProperty("errors",errors);
+        pd.setType(URI.create("https://bingewatch.dev/errors/validation"));
+
+        return handleExceptionInternal(ex, pd, headers, status, request);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnexpectedException(Exception ex){
+    public ProblemDetail handleUnexpectedException(Exception ex){
         log.error("Unhandled exception", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiError.of(HttpStatus.INTERNAL_SERVER_ERROR.value(),"An unexpected error occurred."));
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+        pd.setTitle("Internal Server Error");
+        pd.setType(URI.create("https://bingewatch.dev/errors/internal"));
+        return pd;
     }
 }
