@@ -1,13 +1,9 @@
 spring:
   application:
     name: catalog-service
-  datasource:
-    url: jdbc:postgresql://localhost:5432/catalog
-    username: catalog #TODO move this to a secret
-    password: catalog #TODO move this to a secret
+  profiles:
+    active: dev
   jpa:
-    hibernate:
-      ddl-auto: update      # auto-creates tables from entities (fine for learning)
     show-sql: true          # logs the SQL JPA generates
     properties:
       hibernate.format_sql: true
@@ -16,3 +12,6 @@ spring:
       enabled: true
 server:
   port: 8080
+bingewatch:
+  errors:
+    base-uri: https://bingewatch.dev/errors

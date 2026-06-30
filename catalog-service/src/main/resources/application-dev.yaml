@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/catalog
+    username: catalog
+    password: catalog
+  jpa:
+    hibernate:
+      ddl-auto: update      # auto-creates tables from entities
+bingewatch:
+  errors:
+    base-uri: http://localhost:8080/errors
