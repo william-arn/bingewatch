@@ -33,10 +33,9 @@ public class CatalogController {
 
     @GetMapping("/{id}")
     public ResponseEntity<MovieResponse> findById(@PathVariable Long id) {
-        return service.findById(id)
-                .map(MovieResponse::from)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Movie movie = service.findById(id);
+        return ResponseEntity.ok(MovieResponse.from(movie));
+
     }
 
     @PostMapping

@@ -1,12 +1,11 @@
 package com.bingewatch.catalog.service;
 
+import com.bingewatch.catalog.exception.NotFoundException;
 import com.bingewatch.catalog.repo.MovieRepository;
 import com.bingewatch.catalog.domain.Movie;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class CatalogService {
@@ -20,8 +19,10 @@ public class CatalogService {
         return repo.findAll(genre,releaseYear);
     }
 
-    public Optional<Movie> findById(Long id) {
-        return repo.findById(id);
+    public Movie findById(Long id) {
+
+        return repo.findById(id)
+                .orElseThrow(() -> new NotFoundException("Movie not found with id: "+id));
     }
 
     @Transactional
